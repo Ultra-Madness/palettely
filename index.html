@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Palettely — Color Palette Generator</title>
+<meta name="description" content="Generate beautiful color combinations for your designs. Lock colors you love, copy HEX/RGB/HSL values, and export CSS.">
+<meta name="theme-color" content="#111118">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<style>
+  :root {
+    --bg: #111118;
+    --surface: #1b1b24;
+    --surface-2: #242432;
+    --text: #f2f2f7;
+    --text-dim: #9a9aac;
+    --accent: #7c6cff;
+    --radius: 14px;
+    font-size: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ─────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 20px;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: conic-gradient(from 45deg, #ff6b6b, #ffd93d, #6bcb77, #4d96ff, #b96bff, #ff6b6b);
+  }
+  .brand h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+  .brand span { color: var(--text-dim); font-size: 0.78rem; display: block; font-weight: 400; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  select, .btn {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid #32323f;
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 0.88rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, transform .05s;
+  }
+  select:hover, .btn:hover { background: var(--surface-2); border-color: #45455a; }
+  .btn:active { transform: scale(0.97); }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .btn.primary:hover { background: #8d7fff; }
+  .hint { color: var(--text-dim); font-size: 0.8rem; }
+  kbd {
+    background: var(--surface-2);
+    border: 1px solid #3a3a4a;
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 7px;
+    font-size: 0.75rem;
+    font-family: inherit;
+  }
+
+  /* ── Palette ────────────────────────────── */
+  main { flex: 1; display: flex; min-height: 0; }
+  .swatch {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    padding-bottom: 34px;
+    cursor: pointer;
+    transition: flex .25s ease;
+    outline: none;
+  }
+  .swatch:hover { flex: 1.18; }
+  .swatch-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    opacity: 0.95;
+  }
+  .hex {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+  }
+  .name { font-size: 0.75rem; opacity: 0.75; text-align: center; padding: 0 6px; }
+  .swatch-actions {
+    position: absolute;
+    top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  .swatch:hover .swatch-actions, .swatch:focus-within .swatch-actions { opacity: 1; }
+  .icon-btn {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: none;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    background: rgba(0,0,0,0.22);
+    transition: background .15s, transform .1s;
+  }
+  .icon-btn:hover { background: rgba(0,0,0,0.4); transform: scale(1.08); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  .swatch.locked .lock-btn { opacity: 1; background: rgba(0,0,0,0.45); }
+  .swatch.locked .swatch-actions { opacity: 1; }
+  .dark-text { color: #1a1a1f; }
+  .dark-text .icon-btn { background: rgba(255,255,255,0.35); }
+  .dark-text .icon-btn:hover { background: rgba(255,255,255,0.55); }
+  .light-text { color: #ffffff; }
+
+  /* ── Toast ──────────────────────────────── */
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--surface);
+    border: 1px solid #3a3a4a;
+    color: var(--text);
+    padding: 12px 22px;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+    transition: transform .25s cubic-bezier(.2,.9,.3,1.2);
+    z-index: 50;
+    pointer-events: none;
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ── Modal (export) ─────────────────────── */
+  dialog {
+    margin: auto;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid #3a3a4a;
+    border-radius: var(--radius);
+    padding: 24px;
+    max-width: min(520px, 92vw);
+    width: 100%;
+  }
+  dialog::backdrop { background: rgba(0,0,0,0.55); }
+  dialog h2 { font-size: 1.05rem; margin-bottom: 14px; }
+  dialog pre {
+    background: var(--bg);
+    border: 1px solid #2c2c38;
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 0.8rem;
+    line-height: 1.55;
+    overflow-x: auto;
+    margin-bottom: 14px;
+    user-select: all;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* ── Install button ─────────────────────── */
+  #installBtn { display: none; }
+
+  /* ── Mobile ─────────────────────────────── */
+  @media (max-width: 640px) {
+    body { overflow: auto; }
+    header { padding: 12px 14px; }
+    .hint { display: none; }
+    main { flex-direction: column; min-height: calc(100vh - 130px); }
+    .swatch {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 18px;
+      min-height: 78px;
+    }
+    .swatch:hover { flex: 1; }
+    .swatch-info { flex-direction: row; align-items: baseline; gap: 10px; }
+    .hex { font-size: 1.05rem; }
+    .swatch-actions {
+      position: static;
+      flex-direction: row;
+      opacity: 1;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-logo" aria-hidden="true"></div>
+    <h1>Palettely<span>Color palette generator</span></h1>
+  </div>
+  <div class="controls">
+    <span class="hint">Press <kbd>Space</kbd> to generate</span>
+    <select id="mode" title="Harmony mode" aria-label="Harmony mode">
+      <option value="random">Surprise me</option>
+      <option value="pastel">Pastel</option>
+      <option value="vibrant">Vibrant</option>
+      <option value="earthy">Earthy</option>
+      <option value="mono">Monochrome</option>
+      <option value="analogous">Analogous</option>
+      <option value="complementary">Complementary</option>
+      <option value="dark">Dark mode</option>
+    </select>
+    <button class="btn" id="exportBtn">Export</button>
+    <button class="btn" id="installBtn">Install app</button>
+    <button class="btn primary" id="generateBtn">Generate</button>
+  </div>
+</header>
+
+<main id="palette" aria-label="Color palette"></main>
+
+<div id="toast" role="status"></div>
+
+<dialog id="exportModal">
+  <h2>Export palette</h2>
+  <pre id="exportCode"></pre>
+  <div class="modal-actions">
+    <button class="btn" id="copyExport">Copy CSS</button>
+    <button class="btn" id="closeExport">Close</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+
+/* ───────────────────────── Color utilities ───────────────────────── */
+
+const rand = (min, max) => Math.random() * (max - min) + min;
+const randInt = (min, max) => Math.floor(rand(min, max + 1));
+
+function hslToRgb(h, s, l) {
+  s /= 100; l /= 100;
+  const k = n => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0), f(8), f(4)].map(v => Math.round(v * 255));
+}
+
+function rgbToHex([r, g, b]) {
+  return "#" + [r, g, b].map(v => v.toString(16).padStart(2, "0")).join("");
+}
+
+function relativeLuminance([r, g, b]) {
+  const lin = v => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/* Rough color naming so beginners get a human handle on each color */
+function colorName(h, s, l) {
+  if (l >= 93) return "White";
+  if (l <= 8) return "Black";
+  if (s <= 10) return l > 60 ? "Light Gray" : l > 35 ? "Gray" : "Dark Gray";
+  const hues = [
+    [15, "Red"], [40, "Orange"], [65, "Yellow"], [95, "Lime"],
+    [150, "Green"], [185, "Teal"], [215, "Sky Blue"], [255, "Blue"],
+    [285, "Purple"], [320, "Magenta"], [345, "Pink"], [361, "Red"]
+  ];
+  let base = "Color";
+  for (const [max, name] of hues) { if (h < max) { base = name; break; } }
+  const prefix = l > 75 ? "Light " : l < 28 ? "Deep " : s > 85 ? "Vivid " : "";
+  return prefix + base;
+}
+
+/* ───────────────────────── Palette generation ───────────────────────── */
+
+const N = 5;
+
+const generators = {
+  random: () => Array.from({ length: N }, () =>
+    [randInt(0, 359), randInt(35, 95), randInt(25, 80)]),
+
+  pastel: () => {
+    const start = randInt(0, 359);
+    return Array.from({ length: N }, (_, i) =>
+      [(start + i * randInt(40, 75)) % 360, randInt(38, 62), randInt(78, 89)]);
+  },
+
+  vibrant: () => {
+    const start = randInt(0, 359);
+    return Array.from({ length: N }, (_, i) =>
+      [(start + i * 72 + randInt(-14, 14)) % 360, randInt(82, 100), randInt(48, 62)]);
+  },
+
+  earthy: () => {
+    const earthHues = [18, 28, 36, 45, 80, 100, 24, 350];
+    return Array.from({ length: N }, () =>
+      [earthHues[randInt(0, earthHues.length - 1)] + randInt(-8, 8),
+       randInt(28, 60), randInt(28, 72)]);
+  },
+
+  mono: () => {
+    const h = randInt(0, 359), s = randInt(45, 85);
+    const lights = [16, 34, 52, 70, 88];
+    return lights.map(l => [h + randInt(-4, 4), s + randInt(-8, 8), l]);
+  },
+
+  analogous: () => {
+    const h = randInt(0, 359);
+    return Array.from({ length: N }, (_, i) =>
+      [(h + (i - 2) * randInt(18, 26) + 360) % 360, randInt(55, 85), randInt(40, 72)]);
+  },
+
+  complementary: () => {
+    const h = randInt(0, 359), h2 = (h + 180) % 360;
+    return [
+      [h, randInt(65, 90), randInt(30, 45)],
+      [h, randInt(55, 80), randInt(55, 68)],
+      [(h + randInt(-12, 12) + 360) % 360, randInt(25, 45), randInt(85, 92)],
+      [h2, randInt(55, 80), randInt(55, 68)],
+      [h2, randInt(65, 90), randInt(32, 48)],
+    ];
+  },
+
+  dark: () => {
+    const h = randInt(0, 359);
+    return [
+      [h, randInt(15, 35), randInt(8, 13)],
+      [(h + randInt(-10, 10) + 360) % 360, randInt(18, 38), randInt(16, 22)],
+      [(h + randInt(-10, 10) + 360) % 360, randInt(15, 30), randInt(28, 36)],
+      [(h + randInt(120, 200)) % 360, randInt(70, 95), randInt(58, 68)],
+      [h, randInt(8, 18), randInt(88, 94)],
+    ];
+  },
+};
+
+/* ───────────────────────── State & rendering ───────────────────────── */
+
+let colors = [];          // [{h,s,l,hex,rgb,locked}]
+const paletteEl = document.getElementById("palette");
+const modeEl = document.getElementById("mode");
+
+const ICON_COPY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+const ICON_LOCK_OPEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>';
+const ICON_LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+
+function generate() {
+  const fresh = generators[modeEl.value]();
+  colors = fresh.map((hsl, i) => {
+    if (colors[i] && colors[i].locked) return colors[i];
+    let [h, s, l] = hsl;
+    h = ((h % 360) + 360) % 360;
+    s = Math.max(0, Math.min(100, s));
+    l = Math.max(0, Math.min(100, l));
+    const rgb = hslToRgb(h, s, l);
+    return { h, s, l, rgb, hex: rgbToHex(rgb), locked: false };
+  });
+  render();
+}
+
+function render() {
+  paletteEl.innerHTML = "";
+  colors.forEach((c, i) => {
+    const light = relativeLuminance(c.rgb) > 0.35;
+    const div = document.createElement("div");
+    div.className = "swatch " + (light ? "dark-text" : "light-text") + (c.locked ? " locked" : "");
+    div.style.background = c.hex;
+    div.tabIndex = 0;
+    div.setAttribute("role", "button");
+    div.setAttribute("aria-label", `${c.hex}, ${colorName(c.h, c.s, c.l)}. Click to copy.`);
+    div.innerHTML = `
+      <div class="swatch-actions">
+        <button class="icon-btn lock-btn" title="${c.locked ? "Unlock" : "Lock"} this color">${c.locked ? ICON_LOCK : ICON_LOCK_OPEN}</button>
+        <button class="icon-btn copy-rgb" title="Copy RGB">${ICON_COPY}</button>
+      </div>
+      <div class="swatch-info">
+        <div class="hex">${c.hex}</div>
+        <div class="name">${colorName(c.h, c.s, c.l)}</div>
+      </div>`;
+
+    div.addEventListener("click", () => copy(c.hex, `${c.hex.toUpperCase()} copied`));
+    div.addEventListener("keydown", e => {
+      if (e.key === "Enter") copy(c.hex, `${c.hex.toUpperCase()} copied`);
+    });
+    div.querySelector(".lock-btn").addEventListener("click", e => {
+      e.stopPropagation();
+      c.locked = !c.locked;
+      render();
+    });
+    div.querySelector(".copy-rgb").addEventListener("click", e => {
+      e.stopPropagation();
+      copy(`rgb(${c.rgb.join(", ")})`, "RGB value copied");
+    });
+    paletteEl.appendChild(div);
+  });
+}
+
+/* ───────────────────────── Copy & toast ───────────────────────── */
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1600);
+}
+
+async function copy(text, msg) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  showToast(msg);
+}
+
+/* ───────────────────────── Export ───────────────────────── */
+
+const modal = document.getElementById("exportModal");
+document.getElementById("exportBtn").addEventListener("click", () => {
+  const css = ":root {\n" + colors.map((c, i) =>
+    `  --color-${i + 1}: ${c.hex}; /* ${colorName(c.h, c.s, c.l)} */`).join("\n") + "\n}";
+  document.getElementById("exportCode").textContent = css;
+  modal.showModal();
+});
+document.getElementById("closeExport").addEventListener("click", () => modal.close());
+document.getElementById("copyExport").addEventListener("click", () => {
+  copy(document.getElementById("exportCode").textContent, "CSS copied to clipboard");
+});
+
+/* ───────────────────────── Events ───────────────────────── */
+
+document.getElementById("generateBtn").addEventListener("click", generate);
+modeEl.addEventListener("change", generate);
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && !e.repeat &&
+      !["SELECT", "BUTTON", "INPUT", "TEXTAREA"].includes(document.activeElement.tagName) &&
+      !modal.open) {
+    e.preventDefault();
+    generate();
+  }
+});
+
+/* ───────────────────────── PWA install ───────────────────────── */
+
+let deferredPrompt;
+const installBtn = document.getElementById("installBtn");
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  installBtn.style.display = "inline-block";
+});
+installBtn.addEventListener("click", async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  installBtn.style.display = "none";
+});
+window.addEventListener("appinstalled", () => showToast("App installed 🎉"));
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () =>
+    navigator.serviceWorker.register("./sw.js").catch(() => {}));
+}
+
+/* ───────────────────────── Init ───────────────────────── */
+generate();
+</script>
+</body>
+</html>
